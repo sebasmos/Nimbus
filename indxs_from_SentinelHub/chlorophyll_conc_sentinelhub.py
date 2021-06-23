@@ -20,19 +20,26 @@ from multiprocessing import Pool, freeze_support
 import pickle
 import time
 
-data_folder='C:/Users/Pascal/Desktop/UZH_2021/'
+AW = 1
+
+if AW:
+    base_path = 'C:/Users/Pascal/Desktop/UZH_2021/'
+    
+data_folder = base_path + 'Nimbus/indxs_from_SentinelHub/'
 
 # %% select time intervals
 
-dates = pd.date_range('2021-05-01', '2021-06-01')
+dates = pd.date_range('2019-01-01', '2021-06-01')
 
 # %% select footprint
 
-# Veniche
-box = pd.DataFrame({'lon_min': 12.508055 - 0.1,
-                    'lon_max': 12.508055 + 0.1,
-                    'lat_min': 45.314247 - 0.1,
-                    'lat_max': 45.314247 + 0.1}, index=[0])
+area = 'Venice'
+
+if area == 'Venice':
+    box = pd.DataFrame({'lon_min': 12.508055 - 0.1,
+                        'lon_max': 12.508055 + 0.1,
+                        'lat_min': 45.314247 - 0.1,
+                        'lat_max': 45.314247 + 0.1}, index=[0])
     
 # %% examples of customscript extraction from website
 
@@ -160,7 +167,7 @@ if __name__ == '__main__':
         # sentinelhubpy download and processing
         for res_request, k in p.map(sentinelhub_dp, range(0, len(dates))):
             
-            results[k] = res_request
+            results[dates[k].strftime('%Y-%m-%d')] = res_request
             
     end_time = time.time()
     end_local_time = time.ctime(end_time)
@@ -170,7 +177,7 @@ if __name__ == '__main__':
     print("--- End time: %s ---" % end_local_time)
     
 
-    filename = data_folder + 'sentinelhub_results' + '.pkl'
+    filename = data_folder + 'SH_results_' + area + '.pkl'
     f = open(filename, 'wb')
     pickle.dump(results, f)
     f.close()  
