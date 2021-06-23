@@ -24,7 +24,7 @@ data_folder='C:/Users/Pascal/Desktop/UZH_2021/'
 
 # %% select time intervals
 
-dates = pd.date_range('2017-01-01', '2021-06-01')
+dates = pd.date_range('2021-05-01', '2021-06-01')
 
 # %% select footprint
 
@@ -32,7 +32,7 @@ dates = pd.date_range('2017-01-01', '2021-06-01')
 box = pd.DataFrame({'lon_min': 12.508055 - 0.1,
                     'lon_max': 12.508055 + 0.1,
                     'lat_min': 45.314247 - 0.1,
-                    'lat_max': 45.314247 + 0.1})
+                    'lat_max': 45.314247 + 0.1}, index=[0])
     
 # %% examples of customscript extraction from website
 
@@ -42,15 +42,6 @@ def link_to_text(link):
     return f.text
 
 
-# Normalized Difference Vegetation Index (NDVI)
-escript_NDVI = link_to_text('https://custom-scripts.sentinel-hub.com/'
-                            + 'custom-scripts/sentinel-2/ndvi/script.js')
-
-# Normalized Difference Snow Index (NDSI)
-escript_NDSI = link_to_text('https://custom-scripts.sentinel-hub.com/' 
-                            + 'custom-scripts/sentinel-2/ndsi/script.js')
-
-
 # %% example of homemade version 3 customscript (computes NDVI, NDMI and SAVI)
 
 escript_NDIs = """
@@ -58,11 +49,11 @@ escript_NDIs = """
         function setup() {
             return {
                 input: [{
-                    bands: ["B04", "B08", "B11"],
+                    bands: ["B02", "B04", "B05", "B08", "B11"],
                     units: "DN"
                 }],
                 output: {
-                    bands: 3,
+                    bands: 4,
                     sampleType: "FLOAT32"
                 }
             };
@@ -75,6 +66,14 @@ escript_NDIs = """
 
             var L = 0.428
             var SAVI = (ds.B08 - ds.B04) / (ds.B08 + ds.B04 + L) * (1.0 + L)
+            
+            var ARI =  1.0 / ds.B03 - 1.0 / ds.B05;
+            
+            var y = 0.106;
+            var ARVI = (ds.B08 - ds.B04 - y * (ds.B04 - ds.B02))\
+                / (ds.B08 + ds.B04 - y * (ds.B04 - ds.B02));
+                
+            
 
             return [NDVI, NDMI, SAVI];
         }
@@ -103,7 +102,7 @@ def sentinelhub_request(time_interval, footprint, evalscript):
     loc_size = bbox_to_dimensions(loc_bbox, resolution=40)
 
     request_all_bands = SentinelHubRequest(
-        data_folder=path,
+        data_folder=data_folder,
         evalscript=evalscript,
         input_data=[
             SentinelHubRequest.input_data(
@@ -128,7 +127,7 @@ def sentinelhub_request(time_interval, footprint, evalscript):
 
 def sentinelhub_dp(k):
     
-    date = dates.iloc[k]
+    date = dates[k].strftime('%Y-%m-%d')
     
     coords = [box.lon_min, box.lat_min,
               box.lon_max, box.lat_max]
@@ -136,7 +135,7 @@ def sentinelhub_dp(k):
     outputs = sentinelhub_request(footprint=coords, time_interval=(date, date),
                                   evalscript=escript_NDIs)
     
-    print(box)
+    print(date)
     
     return outputs, k
 
@@ -159,7 +158,7 @@ if __name__ == '__main__':
     with Pool(nb_cores) as p:
         
         # sentinelhubpy download and processing
-        for res_request, k in p.map(sentinelhub_dp, range(0, len(boxes))):
+        for res_request, k in p.map(sentinelhub_dp, range(0, len(dates))):
             
             results[k] = res_request
             
@@ -171,7 +170,7 @@ if __name__ == '__main__':
     print("--- End time: %s ---" % end_local_time)
     
 
-    filename = path + 'sentinelhub_results' + '.pkl'
+    filename = data_folder + 'sentinelhub_results' + '.pkl'
     f = open(filename, 'wb')
     pickle.dump(results, f)
     f.close()  
