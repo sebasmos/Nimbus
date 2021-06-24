@@ -106,7 +106,7 @@ if config.sh_client_id == '' or config.sh_client_secret == '':
 def sentinelhub_request(time_interval, footprint, evalscript):
 
     loc_bbox = BBox(bbox=footprint, crs=CRS.WGS84)
-    loc_size = bbox_to_dimensions(loc_bbox, resolution=40)
+    loc_size = bbox_to_dimensions(loc_bbox, resolution=100)
 
     request_all_bands = SentinelHubRequest(
         data_folder=data_folder,
@@ -177,7 +177,7 @@ if __name__ == '__main__':
     print("--- End time: %s ---" % end_local_time)
     
 
-    filename = data_folder + 'SH_results_' + area + '.pkl'
+    filename = data_folder + 'SH_results_100m_' + area + '.pkl'
     f = open(filename, 'wb')
     pickle.dump(results, f)
     f.close()  
