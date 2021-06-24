@@ -27,7 +27,13 @@ def ESA(gj_feat, token):
                 "geometry": gj_feat.geometry,
             },
             "data": [{
-                "type": "byoc-45ce0fb2-fdaf-481e-b834-f728a8677e59" #Raw_N3_tsmnn_data collection ID
+                "type": "byoc-45ce0fb2-fdaf-481e-b834-f728a8677e59", #Raw_N3_tsmnn_data collection ID
+                "dataFilter":{
+                    "timeRange":{
+                        "from": "2018-10-01T00:00:00Z",
+                        "to": "2018-11-01T00:00:00Z"
+                    }
+                }
             }],
         },
         "evalscript": """
