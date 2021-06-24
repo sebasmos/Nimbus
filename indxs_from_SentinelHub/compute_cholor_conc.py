@@ -3,14 +3,8 @@
 
 @author: Adrien Wehrlé, GEUS (Geological Survey of Denmark and Greenland)
 
-Automated download and processing of satellite data using the
+Automated download and processing of satellite data using the 
 Sentinel Hub Python package sentinelhub-py.
-
-Each request can be associated with a different area of interest and
-time interval provided by previously created information files.
-
-Script is run on an example case where few indexes are computed over
-random footprint areas and time intervals using SENTINEL2 L1C.
 
 Based on the documentation of the Sentinel Hub Python package (SINERGISE):
 https://sentinelhub-py.readthedocs.io/en/latest/
@@ -25,18 +19,35 @@ import pandas as pd
 from multiprocessing import Pool, freeze_support
 import pickle
 import time
+import numpy as np
 
+AW = 1
 
-# %% set path to Github repository
+if AW:
+    base_path = '/home/sebasmos/Documentos/NASA_Spaceapps'
+    
+data_folder = base_path + 'Nimbus/indxs_from_SentinelHub/'
 
-path = '/path/to/sentinelhubpy-tools/'
+# %% select time intervals
 
+dates = pd.date_range('2019-01-01', '2021-06-01')
 
-# %% load information file providing footprint areas and time intervals
+# %% select footprint
 
-boxes = pd.read_csv(path + 'box_examples.csv')
+area = 'Venice'
+sat = 'MODIS'
 
-
+if area == 'Venice':
+    box = pd.DataFrame({'lon_min': 12.508055 - 0.1,
+                        'lon_max': 12.508055 + 0.1,
+                        'lat_min': 45.314247 - 0.1,
+                        'lat_max': 45.314247 + 0.1}, index=[0])
+    
+if sat == 'MODIS':
+    
+    #0C2
+    a_coeffs = [0.1977, -1.8117, 1.9743, -2.5635, -0.7218]
+    
 # %% examples of customscript extraction from website
 
 
@@ -45,23 +56,14 @@ def link_to_text(link):
     return f.text
 
 
-# Normalized Difference Vegetation Index (NDVI)
-escript_NDVI = link_to_text('https://custom-scripts.sentinel-hub.com/'
-                            + 'custom-scripts/sentinel-2/ndvi/script.js')
-
-# Normalized Difference Snow Index (NDSI)
-escript_NDSI = link_to_text('https://custom-scripts.sentinel-hub.com/'
-                            + 'custom-scripts/sentinel-2/ndsi/script.js')
-
-
 # %% example of homemade version 3 customscript (computes NDVI, NDMI and SAVI)
 
-escript_NDIs = """
+escript_CI = """
         //VERSION=3
         function setup() {
             return {
                 input: [{
-                    bands: ["B04", "B08", "B11"],
+                    bands: ["B02", "B03", "B04"],
                     units: "DN"
                 }],
                 output: {
@@ -70,24 +72,23 @@ escript_NDIs = """
                 }
             };
         }
-
+    
         function evaluatePixel(ds) {
 
-            var NDVI = (ds.B08 - ds.B04) / (ds.B08 + ds.B04)
-            var NDMI = (ds.B08 - ds.B11) / (ds.B08 + ds.B11)
+            var CI = ds.B03 - (ds.B02 + (0.56 - 0.48) / (0.65 - 0.48)\
+                              * (ds.B04 - ds.B02))
+                
+            var BG_ratio = ds.02 / ds.03
 
-            var L = 0.428
-            var SAVI = (ds.B08 - ds.B04) / (ds.B08 + ds.B04 + L) * (1.0 + L)
-
-            return [NDVI, NDMI, SAVI];
+            return BG_ratio;
         }
     """
 
 
 # %% sentinelhubpy request
 
-CLIENT_ID = 'my_id'
-CLIENT_SECRET = 'my_secret'
+CLIENT_ID = '856c8767-5815-46ae-83d8-532d2bd3b4b5'
+CLIENT_SECRET = 'wAu1BblYezV%^].?i,j*{/<suZ:@lWYauuXGxNF&' 
 
 config = SHConfig()
 
@@ -103,16 +104,15 @@ if config.sh_client_id == '' or config.sh_client_secret == '':
 def sentinelhub_request(time_interval, footprint, evalscript):
 
     loc_bbox = BBox(bbox=footprint, crs=CRS.WGS84)
-    loc_size = bbox_to_dimensions(loc_bbox, resolution=40)
+    loc_size = bbox_to_dimensions(loc_bbox, resolution=100)
 
     request_all_bands = SentinelHubRequest(
-        data_folder=path,
+        data_folder=data_folder,
         evalscript=evalscript,
         input_data=[
             SentinelHubRequest.input_data(
-                data_collection=DataCollection.SENTINEL2_L1C,
-                time_interval=time_interval,
-                mosaicking_order='leastCC')],
+                data_collection=DataCollection.LANDSAT8,
+                time_interval=time_interval)],
         responses=[
             SentinelHubRequest.output_response('default', MimeType.TIFF)
         ],
@@ -120,7 +120,7 @@ def sentinelhub_request(time_interval, footprint, evalscript):
         size=loc_size,
         config=config
     )
-
+    
     outputs = request_all_bands.get_data()[0]
 
     return outputs
@@ -130,27 +130,21 @@ def sentinelhub_request(time_interval, footprint, evalscript):
 
 
 def sentinelhub_dp(k):
-
-    box = boxes.iloc[k]
-
-    dt = (str(pd.to_datetime(box.time) - pd.Timedelta(days=1))[:10],
-          str(pd.to_datetime(box.time) + pd.Timedelta(days=1))[:10])
-
+    
+    date = dates[k].strftime('%Y-%m-%d')
+    
     coords = [box.lon_min, box.lat_min,
               box.lon_max, box.lat_max]
 
-    outputs = sentinelhub_request(footprint=coords, time_interval=dt,
-                                  evalscript=escript_NDIs)
-
-    print(box)
-
+    outputs = sentinelhub_request(footprint=coords, time_interval=(date, date),
+                                  evalscript=escript_CI)
+    
+    print(date)
+    
     return outputs, k
 
 
 # %% run all requests using multiprocessing
-
-# set save
-save = True
 
 # store results in dict as footprint size can be variable
 results = {}
@@ -158,30 +152,35 @@ results = {}
 if __name__ == '__main__':
 
     freeze_support()
-
+    
     # choose the number of machine cores to use
     nb_cores = 6
-
+    
     start_time = time.time()
     start_local_time = time.ctime(start_time)
-
+    
     with Pool(nb_cores) as p:
-
+        
         # sentinelhubpy download and processing
-        for res_request, k in p.map(sentinelhub_dp, range(0, len(boxes))):
-
-            results[k] = res_request
-
+        for BG_r, k in p.map(sentinelhub_dp, range(0, len(dates))):
+            
+            chloro_conc_log = a_coeffs[0] + np.sum([a_coeffs[i]
+                                                    * (np.log(BG_r) ** i) 
+                                                    for i in range(0, len(a_coeffs))])
+            
+            chloro_conc = np.exp(chloro_conc_log)
+            
+            results[dates[k].strftime('%Y-%m-%d')] = chloro_conc
+            
     end_time = time.time()
     end_local_time = time.ctime(end_time)
     processing_time = (end_time - start_time) / 60
     print("--- Processing time: %s minutes ---" % processing_time)
     print("--- Start time: %s ---" % start_local_time)
     print("--- End time: %s ---" % end_local_time)
+    
 
-    if save:
-
-        filename = path + 'sentinelhub_results' + '.pkl'
-        f = open(filename, 'wb')
-        pickle.dump(results, f)
-        f.close()
+    filename = data_folder + 'SH_chloroconc_100m_' + area + '.pkl'
+    f = open(filename, 'wb')
+    pickle.dump(results, f)
+    f.close()  
