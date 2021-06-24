@@ -23,7 +23,7 @@ import time
 AW = 1
 
 if AW:
-    base_path = 'C:/Users/Pascal/Desktop/UZH_2021/'
+    base_path = '/home/sebasmos/Documentos/NASA_Spaceapps'
     
 data_folder = base_path + 'Nimbus/indxs_from_SentinelHub/'
 
