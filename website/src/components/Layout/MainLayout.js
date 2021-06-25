@@ -31,7 +31,7 @@ class MainLayout extends React.Component {
 
       this.notificationSystem.addNotification({
         title: <MdImportantDevices />,
-        message: 'Welome to Reduction Admin!',
+        message: 'Welome to Nimbus Admin!',
         level: 'info',
       });
     }, 1500);
@@ -44,7 +44,7 @@ class MainLayout extends React.Component {
       this.notificationSystem.addNotification({
         title: <MdLoyalty />,
         message:
-          'Reduction is carefully designed template powered by React and Bootstrap4!',
+          'Nimbus is carefully designed template powered by React and Bootstrap4!',
         level: 'info',
       });
     }, 2500);
